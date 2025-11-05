@@ -1,4 +1,7 @@
-import { makeId, readJsonFile, writeJsonFile } from "./utils.js"
+import { loggerService } from "../../services/logger.service.js";
+import { makeId, readJsonFile, writeJsonFile } from "../../services/utils.js";
+
+const PAGE_SIZE = 6
 
 export const bugService = {
     query,
@@ -11,8 +14,28 @@ const bugs = readJsonFile('./data/bugs.json')
 
 
 async function query(filterBy = {}) {
+    const { txt = '', minSeverity = 0, labels = [], pageIdx = 0, sortBy = 'txt', orderBy = -1 } = filterBy
+    const maxPage= Math.ceil(bugs.length / PAGE_SIZE)
+    const validPageIdx = (pageIdx >=0 && pageIdx < maxPage) ? pageIdx : 0
+    const startIdx = validPageIdx * PAGE_SIZE
+    const endIdx = startIdx + PAGE_SIZE
+
+    const filteredBugs = bugs.filter(bug => {
+        loggerService.debug('Filtering bugs with', filterBy)
+        loggerService.debug('bug:', bug)
+        return (
+            bug.title.includes(txt) &&
+            bug.severity >= minSeverity &&
+            (labels.length === 0 || labels.every(label => bug.labels.includes(label)))
+        )
+    }).sort((a, b) => {
+        const aVal = a[sortBy]
+        const bVal = b[sortBy]
+        return (aVal < bVal ? -1 : 1) * orderBy
+    })
+
     try {
-        return bugs
+        return [filteredBugs.slice(startIdx, endIdx), Math.ceil(filteredBugs.length / PAGE_SIZE)]
     } catch (err) {
         throw err
     }
@@ -49,6 +72,7 @@ async function save(bugToSave) {
             bugs[bugIdx] = bugToSave
         } else {
             bugToSave._id = makeId()
+            bugToSave.createdAt = Date.now()
             bugs.push(bugToSave)
         }
         await _savebugsToFile()

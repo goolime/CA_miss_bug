@@ -1,7 +1,3 @@
-
-import { storageService } from './async-storage.service.js'
-import { utilService } from './util.service.js'
-
 import Axios from 'axios'
 const axios = Axios.create({
     withCredentials: true
@@ -14,21 +10,49 @@ export const bugService = {
     getById,
     save,
     remove,
+    getDefaultFilter
 }
 
 
-function query() {
-    return axios.get(BASE_URL)
+function query(filterBy) {
+    return axios.get(BASE_URL, { params: filterBy })
         .then(res => res.data)
-        .then(bugs => bugs)
+        .then(([bugs, totalPages]) => [bugs, totalPages])
 }
 function getById(bugId) {
     return axios.get(`${BASE_URL}${bugId}`)
         .then(res => res.data)
 }
-function remove(bugId) {
-    return axios.get(`${BASE_URL}${bugId}/remove`)
+async function remove(bugId) {
+     const url = BASE_URL + bugId
+    try {
+        const { data } = await axios.delete(url)
+        return data
+    } catch (err) {
+        console.log('err:', err)
+        throw err
+    }
 }
-function save(bug) {
-    return axios.get(BASE_URL + 'save', { params: bug }).then(res => res.data)
+async function save(bug) {
+    const url = BASE_URL + (bug._id || '')
+    const method = bug._id ? 'put' : 'post'
+
+    try {
+        const { data: savedBug } = await axios[method](url, bug)
+        return savedBug
+    } catch (err) {
+        console.log('err:', err)
+        throw err
+    }
+}
+
+function getDefaultFilter() {
+    return {
+        txt: '',
+        minSeverity: 0,
+        labels: [],
+        sortBy: 'txt',
+        orderBy: 1,
+        pageIdx: 0
+    }
 }
